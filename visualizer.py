@@ -55,8 +55,7 @@ class Visualizer:
             features_columns = self.transformer.get_feature_names()
 
             self.features_df_ = pd.DataFrame(data=features_data,
-                                            columns=features_columns)
-
+                                             columns=features_columns)
 
     def make_cloud(self, height=300, width=800, max_words=100,
                    split=None, stopwords=None, colormap='viridis', background_color='black'):
