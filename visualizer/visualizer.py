@@ -12,7 +12,7 @@ from sklearn.metrics import (auc, confusion_matrix,
 from sklearn.preprocessing import LabelBinarizer
 
 
-class Visualizer:
+class RedditVisualizer:
     """
     Functions to vizualize text data
 
@@ -167,7 +167,7 @@ class Visualizer:
             plt.axis(False)
             plt.show()
 
-    def plot_most_common(self, num_features=20, standardize=False, include_combined=False):
+    def plot_most_common_features(self, num_features=20, standardize=False, include_combined=False):
         '''
         Plots the most common features for each subreddit in the DataFrame
 
@@ -283,7 +283,7 @@ class Visualizer:
         ax.legend(fontsize=15, fancybox=True,
                   framealpha=1, shadow=True, borderpad=1)
 
-    def plot_feature_importance(self, model, figsize=(16, 12), n_features=10, colormap='Blues_d'):
+    def plot_coef_feature_importance(self, figsize=(16, 12), n_features=10, colormap='Blues_d'):
         '''Plots the feature importance seaparately for each class
 
         Parameters:
@@ -291,15 +291,15 @@ class Visualizer:
         n_features: number of top and bottom features to display
         colormap: choose from matplotlib colormaps
         '''
-        if hasattr(model, 'coef_'):
+        if hasattr(self.model, 'coef_'):
             coef_dict = {}
             for i, label in enumerate(self.labels_):
                 coef_dict[label] = pd.DataFrame(
-                    data=model.coef_[i],
+                    data=self.model.coef_[i],
                     index=self.transformer.get_feature_names())
         else:
             raise AttributeError('Model does not have coefficients')
-        for sub, coef_df in coef_dict.items():
+        for label, coef_df in coef_dict.items():
 
             plt.figure(figsize=(16, 12))
             plt.style.use('seaborn-poster')
@@ -309,8 +309,24 @@ class Visualizer:
             top_and_bottom = pd.DataFrame(data=top_10.append(bottom_10))
             sns.barplot(x=top_and_bottom[0], y=top_and_bottom.index, palette=colormap)
 
-            plt.title(f'Feature Importance for {sub.upper()}', fontsize=20)
+            plt.title(f'Feature Importance for {label.upper()}', fontsize=20)
             plt.xlabel('Coefficients', fontsize=18)
+
+
+class ClassificationResultsVisualizer:
+    """Visualize the classification results of a trained model.
+
+    This requires y_pred and y_proba to already be defined.
+    Design choice
+    """
+
+    def __init__(self, transformer, model, y_true=None, y_pred=None, y_proba=None):
+        self.transformer = transformer
+        self.model = model
+        self.y_true = y_true
+        self.y_pred = y_pred
+        self.y_proba = y_proba
+        self.labels_ = np.unique(y_true)
 
     def plot_roc_curve(self, fpr, tpr, label):
         '''ROC curve plot helper'''
@@ -323,37 +339,37 @@ class Visualizer:
         plt.title(f'ROC Curve for {str.upper(label)}')
         plt.legend(loc='lower right')
 
-    def plot_class_roc_curves(self, y_true, y_probs):
+    def plot_class_roc_curves(self, y_true, y_proba):
         '''Plots an ROC curve for each class'''
         bin = LabelBinarizer()
-        y_test_bin = bin.fit_transform(y_true)
+        y_true_bin = bin.fit_transform(y_true)
         for i, label in enumerate(self.labels_):
-            fpr, tpr, thresholds = roc_curve(y_test_bin[:, i], y_probs[:, i])
+            fpr, tpr, thresholds = roc_curve(y_true_bin[:, i], y_proba[:, i])
             self.plot_roc_curve(fpr, tpr, label)
 
-    def display_probabilities_df(self, y_pred, y_probs):
+    def display_probabilities_df(self):
         '''Display the probabilities along with predicted and actual classes as df'''
-        probs_df = pd.DataFrame(data=y_probs, columns=self.labels_)
-        probs_df['predicted'] = y_pred
-        probs_df['actual'] = self.y
+        probs_df = pd.DataFrame(data=self.y_proba, columns=self.labels_)
+        probs_df['predicted'] = self.y_pred
+        probs_df['actual'] = self.y_true
         return probs_df
 
-    def plot_probability_distribution_overlaid(self, y_probs, bins=100):
+    def plot_probability_distribution_overlaid(self, y_proba, bins=100):
         '''Plots overlaid probability distribution for each class'''
         for i, label in enumerate(self.labels_):
             kwargs = dict(histtype='stepfilled', alpha=0.3, bins=bins, label=label)
-            plt.hist(y_probs[:, i], **kwargs)
+            plt.hist(y_proba[:, i], **kwargs)
             plt.legend()
 
-    def plot_class_probability_distribution(self, y_probs, figsize=(10, 7), bins=100, match_scale=False):
+    def plot_class_probability_distribution(self, y_proba, figsize=(10, 7), bins=100, match_scale=False):
         '''Plot probability distribution'''
         # find the max height of all the histograms to use for ylim
-        y_max = max([np.histogram(y_probs[:, i], bins=bins)[0].max() for i, _ in enumerate(self.labels_)]) * 1.05
+        y_max = max([np.histogram(y_proba[:, i], bins=bins)[0].max() for i, _ in enumerate(self.labels_)]) * 1.05
 
         for i, label in enumerate(self.labels_):
             with plt.style.context('bmh'):
                 plt.figure(figsize=figsize)
-                plt.hist(y_probs[:, i], bins=bins, histtype='stepfilled', alpha=0.3)
+                plt.hist(y_proba[:, i], bins=bins, histtype='stepfilled', alpha=0.3)
                 plt.title(f'Distribution of P(Outcome = 1) {str.upper(label)}', fontsize=22)
                 plt.xlim(-0.1, 1.1)
                 if match_scale:
@@ -452,17 +468,17 @@ class Visualizer:
 
         plt.tight_layout()
 
-    def plot_probability_distribution_pairs(self, y_probs, figsize=(15, 7), bins=25):
+    def plot_probability_distribution_pairs(self, y_proba, figsize=(15, 7), bins=25):
         '''Plots probability distribution for each pair of labels'''
         number_pairs = list(combinations(np.arange(len(self.labels_)), r=2))
         pairs = list(combinations(self.labels_, r=2))
         for pair, number in zip(pairs, number_pairs):
             plt.figure(figsize=figsize)
-            hst0 = plt.hist(y_probs[:, number[0]],
+            hst0 = plt.hist(y_proba[:, number[0]],
                             bins=bins,
                             alpha=0.6,
                             label=pair[0])
-            hst1 = plt.hist(1 - y_probs[:, number[1]],
+            hst1 = plt.hist(1 - y_proba[:, number[1]],
                             bins=bins,
                             alpha=0.6,
                             label=pair[1])
