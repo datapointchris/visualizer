@@ -12,7 +12,7 @@ from sklearn.metrics import (auc, confusion_matrix,
 from sklearn.preprocessing import LabelBinarizer
 
 
-class RedditVisualizer():
+class RedditVisualizer:
     """
     Functions to vizualize text data
 
@@ -313,10 +313,9 @@ class RedditVisualizer():
             plt.xlabel('Coefficients', fontsize=18)
 
 
-
-class ClassificationResultsVisualizer(BaseVisualizer):
+class ClassificationResultsVisualizer:
     """Visualize the classification results of a trained model.
-    
+
     This requires y_pred and y_proba to already be defined.
     Design choice
     """
@@ -328,7 +327,6 @@ class ClassificationResultsVisualizer(BaseVisualizer):
         self.y_pred = y_pred
         self.y_proba = y_proba
         self.labels_ = np.unique(y_true)
-
 
     def plot_roc_curve(self, fpr, tpr, label):
         '''ROC curve plot helper'''
