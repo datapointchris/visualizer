@@ -63,4 +63,6 @@ Temporary Items
 dist
 viz_venv
 build
-*.egg-info.planning
+*.egg-info
+
+.planning
