@@ -1,0 +1,126 @@
+# forge-toolchain: 11
+fail_fast: true
+default_stages: [pre-commit]
+repos:
+
+# generated:conventional-commits - Conventional commits
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.3.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [--strict]
+
+# generated:commit-branding - Strip AI branding from commit messages
+  - repo: local
+    hooks:
+      - id: prepare-commit-msg
+        name: Strip AI branding from commits
+        # $HOME, not a literal path: pre-commit execs entry without a shell, and
+        # the same repo is committed from both /Users/chris and /home/chris.
+        entry: bash -c 'exec "$HOME/.claude/hooks/prepare-commit-msg" "$@"' --
+        language: system
+        always_run: true
+        stages: [prepare-commit-msg]
+
+# generated:file-checks - File format and basic checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # --unsafe parses instead of safe_load'ing. Every mkdocs-material repo
+      # carries `!!python/name:material.extensions.emoji.twemoji`, which
+      # safe_load can never construct — five repos fail this hook without it.
+      # The alternative is excluding mkdocs.yml, which checks strictly less.
+      - id: check-yaml
+        args: [--unsafe]
+      - id: check-toml
+      # tsconfig.json is JSONC — TypeScript documents comments in it, and the
+      # generated one ships with them, so a strict JSON parser is the wrong
+      # tool rather than the file being wrong. check-json5 below still parses
+      # it, so nothing is unchecked.
+      - id: check-json
+        exclude: '(^|/)tsconfig(\..*)?\.json$'
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: check-case-conflict
+      - id: detect-private-key
+
+  - repo: https://gitlab.com/bmares/check-json5
+    rev: v1.0.0
+    hooks:
+      - id: check-json5
+
+# generated:markdown - Markdown
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.47.0
+    hooks:
+      - id: markdownlint
+        args: [--fix]
+
+# generated:shell - Shell
+  #
+  # exclude_types: [zsh] on both tools. Neither supports zsh, and neither says
+  # so — shellcheck lints a .zshrc as bash and reports nothing, while shfmt
+  # reformats it under bash rules: on dotfiles it rewrote `>&2 }` to `>&2; }`,
+  # correct for bash and unnecessary in zsh. Both were silently out of contract,
+  # which is worse than either erroring. identify already tags these files zsh,
+  # so this is the native exclusion rather than a path regex that would have to
+  # enumerate .zshrc, .zprofile, .zlogin and the rest.
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+        exclude_types: [zsh]
+
+  # shfmt has no pre-commit hooks file of its own, so this is the repo shfmt's
+  # README points at. Its `shfmt` id runs the prebuilt upstream binary, which
+  # keeps the hook off a Go toolchain; `shfmt-src` is the one that needs Go.
+  #
+  # No formatting args on purpose. A parser or printer flag does not merge with
+  # .editorconfig — it discards the file wholesale, so adding `--indent 2` here
+  # would silently drop switch_case_indent and binary_next_line along with it.
+  # Output flags (--write, --diff) are safe. .editorconfig is the style.
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.13.1-1
+    hooks:
+      - id: shfmt
+        exclude_types: [zsh]
+
+  # bats ships no hook repo of its own, so this one is local.
+  #
+  # The guard distinguishes "this repo has no tests" from "this repo has tests
+  # and bats is missing". Only the first is allowed to pass: a bare `bats
+  # tests/` under language: system would be the second hook in this portfolio to
+  # report success because its tool was absent, which is how font accumulated
+  # seven shellcheck findings behind a green hook.
+  - repo: local
+    hooks:
+      - id: bats
+        name: bats
+        entry: bash -c 'compgen -G "tests/*.bats" > /dev/null || exit 0; exec bats tests/'
+        language: system
+        pass_filenames: false
+
+# generated:codespell - Spell checking
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      # Lock files are generated and mostly integrity hashes, so a base64
+      # fragment reads as a typo — two of timeline's package-lock.json hashes
+      # each contained a two-letter sequence codespell corrects. Nobody writes
+      # prose in them and nobody would fix a hit, since the next install would
+      # put it back.
+      - id: codespell
+        # The second alternation is sops output. Ciphertext is base64, so it
+        # produces the same false hits a lock file's hashes do, and the plain
+        # name covers homelab's group_data/secrets.yaml as well as the
+        # *.enc.env convention.
+        exclude: '(^|/)(.*-lock\.json|.*\.lock|uv\.lock|package-lock\.json|go\.sum|secrets?[^/]*\.(ya?ml|env|json)|.*\.enc\.[^/]+)$'
