@@ -1,3 +1,5 @@
+# forge-managed
+#
 # Deployed as .editorconfig.
 #
 # This is where shell formatting is defined, not the shfmt hook. shfmt treats a
@@ -5,9 +7,8 @@
 # to it: a single `--indent 2` on the hook would discard switch_case_indent and
 # binary_next_line along with it. Output flags (--write, --diff) are safe.
 #
-# The shell keys sit under [*] rather than [*.sh] because the fleet keeps
-# executables with no extension — bin/font, dotfiles/apps/common/menu,
-# theme/themes/*/bordersrc, ichrisbirch/ops/db. A suffix pattern misses those,
+# The shell keys sit under [*] rather than [*.sh] because a shell executable is
+# commonly shipped with no extension at all. A suffix pattern cannot reach one,
 # and an unmatched file is not skipped: shfmt falls back to tab indentation and
 # reformats it wrongly. shfmt only reads these for files it identifies as shell,
 # so [*] costs nothing there. The per-language sections below exist because
@@ -48,7 +49,7 @@ indent_style = tab
 indent_size = 4
 
 # Inherits indent_size = 2 to agree with markdownlint's MD007, which the shared
-# markdownlint.json leaves at its 2-space default via "default": true.
+# .markdownlint.yaml leaves at its 2-space default via `default: true`.
 # trim_trailing_whitespace matches the trailing-whitespace hook's
 # --markdown-linebreak-ext=md, which preserves the two-space line break; an
 # editor and the hook must not undo each other.

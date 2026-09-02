@@ -1,4 +1,4 @@
-# forge-toolchain: 11
+# forge-toolchain: 20
 fail_fast: true
 default_stages: [pre-commit]
 repos:
@@ -57,9 +57,9 @@ repos:
   #
   # exclude_types: [zsh] on both tools. Neither supports zsh, and neither says
   # so — shellcheck lints a .zshrc as bash and reports nothing, while shfmt
-  # reformats it under bash rules: on dotfiles it rewrote `>&2 }` to `>&2; }`,
-  # correct for bash and unnecessary in zsh. Both were silently out of contract,
-  # which is worse than either erroring. identify already tags these files zsh,
+  # reformats it under bash rules, rewriting `>&2 }` to `>&2; }` — correct for
+  # bash and unnecessary in zsh. Both were silently out of contract, which is
+  # worse than either erroring. identify already tags these files zsh,
   # so this is the native exclusion rather than a path regex that would have to
   # enumerate .zshrc, .zprofile, .zlogin and the rest.
   - repo: https://github.com/koalaman/shellcheck-precommit
@@ -86,9 +86,9 @@ repos:
   #
   # The guard distinguishes "this repo has no tests" from "this repo has tests
   # and bats is missing". Only the first is allowed to pass: a bare `bats
-  # tests/` under language: system would be the second hook in this portfolio to
-  # report success because its tool was absent, which is how font accumulated
-  # seven shellcheck findings behind a green hook.
+  # tests/` under language: system would be the second hook here to report
+  # success because its tool was absent. The first hid seven shellcheck
+  # findings behind a green run.
   - repo: local
     hooks:
       - id: bats
@@ -102,13 +102,44 @@ repos:
     rev: v2.4.1
     hooks:
       # Lock files are generated and mostly integrity hashes, so a base64
-      # fragment reads as a typo — two of timeline's package-lock.json hashes
-      # each contained a two-letter sequence codespell corrects. Nobody writes
-      # prose in them and nobody would fix a hit, since the next install would
-      # put it back.
+      # fragment reads as a typo — a package-lock.json hash can contain a
+      # two-letter sequence codespell corrects. Nobody writes prose in them and
+      # nobody would fix a hit, since the next install would put it back.
       - id: codespell
         # The second alternation is sops output. Ciphertext is base64, so it
-        # produces the same false hits a lock file's hashes do, and the plain
-        # name covers homelab's group_data/secrets.yaml as well as the
-        # *.enc.env convention.
-        exclude: '(^|/)(.*-lock\.json|.*\.lock|uv\.lock|package-lock\.json|go\.sum|secrets?[^/]*\.(ya?ml|env|json)|.*\.enc\.[^/]+)$'
+        # produces the same false hits a lock file's hashes do. The plain
+        # `secrets.yaml` name is covered alongside the *.enc.env convention.
+        #
+        # `go.mod` sits beside `go.sum` for the same reason one step earlier: it
+        # is mostly module paths, and a path is a third party's name rather than
+        # prose anyone here can correct. A transitive dependency can carry a
+        # module name codespell wants spelled differently, and no edit fixes it —
+        # the next `go mod tidy` writes it straight back. Naming such a module
+        # here would trip this hook on this very file.
+        exclude: '(^|/)(.*-lock\.json|.*\.lock|uv\.lock|package-lock\.json|go\.sum|go\.mod|secrets?[^/]*\.(ya?ml|env|json)|.*\.enc\.[^/]+)$'
+
+# generated:refcheck - Reference checking
+  #
+  # `--moves` is what earns this a place on every commit, and running without
+  # it would be close to running nothing. The whole-tree half — every `source`
+  # and `bash` target — finds nothing on a tree that is already clean, which is
+  # the normal state. The moves half asks the question a rename actually leaves
+  # behind, for each one in the changeset, and that is where the findings are:
+  # call sites and documented commands still naming a path that moved.
+  #
+  # Deliberately no path spelled out above. A comment naming a real old path
+  # is itself a hit for it, in every repo this block is deployed to.
+  #
+  # Generic rather than shell-gated, because a pattern is language-agnostic:
+  # the hits land in Go, Vue and Python repos alike, in YAML and prose as
+  # readily as in scripts. The compiled languages catch their own broken
+  # *imports*, which is a different question from what a doc, a Dockerfile or a
+  # shell wrapper still says.
+  #
+  # No --strict: one advisory warning across every repo, and a warning is
+  # about fragility rather than breakage.
+  - repo: https://github.com/datapointchris/refcheck
+    rev: v0.6.0
+    hooks:
+      - id: refcheck
+        args: [--moves]
