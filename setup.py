@@ -7,7 +7,7 @@ setuptools.setup(
     name="visualizer",
     version="0.1.0",
     author="Chris Birch",
-    author_email="chrisbirch@live.com",
+    author_email="chrisbirch@fastmail.com",
     description="Visualizer for data",
     long_description=long_description,
     long_description_content_type="text/markdown",
